@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tk.mybatis.simple.mapper.UserMapper">
+
+	<!-- <cache/> -->
+	<!-- 使用参照缓存避免脏数据 -->
+	<cache-ref namespace="tk.mybatis.simple.mapper.RoleMapper"/>
+	
+	<resultMap type="tk.mybatis.simple.model.SysUser" id="userMap">
+		<id column="uid" property="uid"/>
+		<result column="user_name" property="userName"/>
+		<result column="user_password" property="userPassword"/>
+		<result column="user_email" property="userEmail"/>
+		<result column="user_info" property="userInfo"/>
+		<result column="head_img" property="headImg" jdbcType="BLOB"/>
+		<result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+	</resultMap>
+	
+	<resultMap type="tk.mybatis.simple.model.SysUser" id="userMap2" extends="userMap">
+		<association property="roleList" resultMap="tk.mybatis.simple.mapper.RoleMapper.roleMap">
+		</association>
+	</resultMap>
+	
+	<resultMap type="tk.mybatis.simple.model.SysUser" id="userRoleMapSelect" extends="userMap">
+		<association property="role" 
+							fetchType="lazy"
+							select="tk.mybatis.simple.mapper.RoleMapper.selectRoleByRid" 
+							column="{rid=role_id}">
+		</association>
+	</resultMap>
+	
+	<resultMap type="tk.mybatis.simple.model.SysUser" id="userRoleListMap" extends="userMap">
+		<collection property="roleList" resultMap="tk.mybatis.simple.mapper.RoleMapper.rolePrivilegeListMap">
+		</collection>
+	</resultMap>
+	
+	<resultMap type="tk.mybatis.simple.model.SysUser" id="userRoleListMapSelect" extends="userMap">
+		<association property="roleList" 
+							fetchType="lazy"
+							select="tk.mybatis.simple.mapper.RoleMapper.selectRoleByUserId" 
+							column="{userId=uid}">
+		</association>
+	</resultMap>
+	<!-- 属性flushCache="true"用于清除一级缓存 -->
+	<select id="selectByUid" resultMap="userMap" >
+		select * from sys_user where uid = #{uid}
+	</select>
+	
+	<select id="selectAll" resultType="tk.mybatis.simple.model.SysUser">
+		select 
+			uid,
+			user_name userName,
+			user_password userPassword,
+			user_email userEmail,
+			user_info userInfo,
+			head_img headImg,
+			create_time createTime
+		from
+			sys_user
+	</select>
+	
+	<select id="selectRoleByUid" resultType="tk.mybatis.simple.model.SysRole">
+		select
+			r.rid,
+			r.role_name,
+			r.enabled,
+			r.create_by,
+			r.create_time,
+			u.user_name as "user.userName",
+			u.user_email as "user.userEmail"
+		from
+			sys_user u
+		inner join
+			sys_user_role ur
+		on
+			u.uid = ur.user_id
+		inner join
+			sys_role r
+		on
+			ur.role_id = r.rid
+		where
+			u.uid = #{uid}
+	</select>
+	
+	<insert id="insert">
+		insert into sys_user(
+			user_name, user_password, user_email, user_info, head_img, create_time)
+		values(
+			#{userName}, #{userPassword}, #{userEmail}, #{userInfo}, #{headImg, jdbcType=BLOB}, #{createTime, jdbcType=TIMESTAMP})
+		<selectKey keyColumn="uid" keyProperty="uid" resultType="Integer" order="AFTER">
+			SELECT LAST_INSERT_ID()
+		</selectKey>
+	</insert>
+	
+	<update id="updateByUid">
+		update
+			sys_user
+		set
+			user_name = #{userName},
+			user_password = #{userPassword},
+			user_email = #{userEmail},
+			user_info = #{userInfo},
+			head_img = #{headImg, jdbcType=BLOB},
+			create_time = #{createTime, jdbcType=TIMESTAMP}
+		where
+			uid = #{uid}
+	</update>
+	
+	<delete id="deleteByUid">
+		delete from sys_user where uid = #{uid}
+	</delete>
+	
+	<select id="selectRoleByUidAndRoleEnabled" resultType="tk.mybatis.simple.model.SysRole">
+		select
+			r.rid,
+			r.role_name,
+			r.enabled,
+			r.create_by,
+			r.create_time
+		from
+			sys_user u
+		inner join
+			sys_user_role ur
+		on
+			u.uid = ur.user_id
+		inner join
+			sys_role r
+		on
+			ur.role_id = r.rid
+		where
+			u.uid = #{sysUser.uid}
+		and
+			r.enabled = #{sysRole.enabled}
+	</select>
+	
+	<select id="selectByUser" resultType = "tk.mybatis.simple.model.SysUser">
+		select 
+			uid, user_name, user_password, user_email, user_info, head_img, create_time
+		from
+			sys_user
+		<trim prefix="WHERE" prefixOverrides="AND |OR ">
+			<!-- <if test="userName != null and userName != ''">
+				and user_name like concat ('%', #{userName}, '%')
+			</if> -->
+			<if test="userName != null and userName != ''">
+				<bind name="userNameLike" value="'%'+userName+'%'"/>
+				and user_name like #{userNameLike}
+			</if>
+			<if test="userEmail != null and userEmail != ''">
+				and user_email = #{userEmail}
+			</if>
+		</trim>
+	</select>
+	
+	<update id="updateByUidSelective">
+		update sys_user
+		<trim prefix="SET" suffixOverrides=",">
+			<if test="userName != null and userName != ''">
+				user_name = #{userName, jdbcType=VARCHAR},
+			</if>
+			<if test="userPassword != null and userPassword != ''">
+				user_password = #{userPassword, jdbcType=VARCHAR},
+			</if>
+			<if test="userEmail != null and userEmail != ''">
+				user_email = #{userEmail, jdbcType=VARCHAR},
+			</if>
+			<if test="userInfo != null and userInfo != ''">
+				user_info = #{userInfo, jdbcType=VARCHAR},
+			</if>
+			<if test="headImg != null">
+				head_img = #{headImg, jdbcType=BLOB},
+			</if>
+			<if test="createTime != null">
+				create_time = #{createTime, jdbcType=TIMESTAMP},
+			</if>
+				uid = #{uid}
+		</trim>
+		where 
+			uid = #{uid}
+	</update>
+	
+	<insert id="insert2">
+		insert into sys_user(
+			user_name, user_password, 
+			<if test="userEmail != null and userEmail != ''">
+				user_email, 
+			</if>
+			user_info, head_img, create_time)
+		values(
+			#{userName}, #{userPassword}, 
+			<if test="userEmail != null and userEmail != ''">
+				#{userEmail}, 
+			</if>
+			#{userInfo}, #{headImg, jdbcType=BLOB}, #{createTime, jdbcType=TIMESTAMP})
+		<selectKey keyColumn="uid" keyProperty="uid" resultType="Integer" order="AFTER">
+			SELECT LAST_INSERT_ID()
+		</selectKey>
+	</insert>
+	
+	<select id="selectByUidOrUserName" resultType = "tk.mybatis.simple.model.SysUser">
+		select 
+			uid, user_name, user_password, user_email, user_info, head_img, create_time
+		from
+			sys_user
+		where 1 = 1
+			<choose>
+				<when test="uid != null">
+					and uid = #{uid}
+				</when>
+				<when test="userName != null and userName != ''">
+					and user_name = #{userName}
+				</when>
+				<otherwise>
+					and 1 = 2
+				</otherwise>
+			</choose>
+	</select>
+	<select id="selectByUidList" resultType="tk.mybatis.simple.model.SysUser">
+		select 
+			uid,
+			user_name userName,
+			user_password userPassword,
+			user_email userEmail,
+			user_info userInfo,
+			head_img headImg,
+			create_time createTime
+		from
+			sys_user
+		where uid in
+		<foreach collection="list" open="(" close=")" separator="," item="uid" index="i">
+			#{uid}
+		</foreach>
+	</select>
+	<insert id="insertList">
+		insert into sys_user(
+			user_name, user_password, user_email, user_info, head_img, create_time)
+		values
+			<foreach collection="list" item="user" separator=",">
+				(
+					#{user.userName}, #{user.userPassword}, 
+					#{user.userEmail}, #{user.userInfo}, 
+					#{user.headImg, jdbcType=BLOB}, #{user.createTime, jdbcType=TIMESTAMP}
+				)
+			</foreach>
+	</insert>
+	
+	<update id="updateByMap">
+		update sys_user
+		set
+			<foreach collection="_parameter" item="val" index="key" separator=",">
+				${key} = #{val}
+			</foreach>
+		where
+			uid = #{uid}
+	</update>
+	
+	<select id="selectUserAndRoleByUid" resultMap="userMap2">
+		select
+			u.uid,
+			u.user_name,
+			u.user_password,
+			u.user_email,
+			u.user_info,
+			u.head_img,
+			u.create_time,
+			r.rid,
+			r.role_name,
+			r.enabled,
+			r.create_by,
+			r.create_time
+		from
+			sys_user u
+		inner join
+			sys_user_role ur
+		on
+			u.uid = ur.user_id
+		inner join
+			sys_role r
+		on
+			ur.role_id = r.rid
+		where
+			uid = #{uid}
+	</select>
+	
+	<select id="selectUserAndRoleByUidSelect" resultMap="userRoleMapSelect">
+		select
+			u.uid,
+			u.user_name,
+			u.user_password,
+			u.user_email,
+			u.user_info,
+			u.head_img,
+			u.create_time,
+			ur.role_id
+		from
+			sys_user u
+		inner join
+			sys_user_role ur
+		on
+			u.uid = ur.user_id
+		where
+			uid = #{uid}
+	</select>
+	
+	<select id="selectAllUserAndRoles" resultMap="userRoleListMap">
+		select
+			u.uid,
+			u.user_name,
+			u.user_password,
+			u.user_email,
+			u.user_info,
+			u.head_img,
+			u.create_time,
+			r.rid,
+			r.role_name,
+			r.enabled,
+			r.create_by,
+			r.create_time,
+			p.pid,
+			p.privilege_name,
+			p.privilege_url
+		from
+			sys_user u
+		inner join
+			sys_user_role ur
+		on
+			u.uid = ur.user_id
+		inner join
+			sys_role r
+		on
+			ur.role_id = r.rid
+		inner join
+			sys_role_privilege rp
+		on
+			r.rid = rp.role_id
+		inner join
+			sys_privilege p
+		on
+			rp.privilege_id = p.pid
+	</select>
+	
+	<select id="selectAllUserAndRolesSelect" resultMap="userRoleListMapSelect">
+		select
+			u.uid,
+			u.user_name,
+			u.user_password,
+			u.user_email,
+			u.user_info,
+			u.head_img,
+			u.create_time
+		from
+			sys_user u
+		where
+			uid = #{uid}
+	</select>
+	<select id="selectUserByUid" statementType="CALLABLE" useCache="false">
+		{call select_user_by_uid(
+			#{uid, mode=IN},
+			#{userName, mode=OUT, jdbcType=VARCHAR},
+			#{userPassword, mode=OUT, jdbcType=VARCHAR},
+			#{userEmail, mode=OUT, jdbcType=VARCHAR},
+			#{userInfo, mode=OUT, jdbcType=VARCHAR},
+			#{headImg, mode=OUT, jdbcType=BLOB, javaType=_byte[]},
+			#{createTime, mode=OUT, jdbcType=TIMESTAMP}
+		)}
+	</select>
+	<select id="selectUserPage" statementType="CALLABLE" useCache="false" resultMap="userMap">
+		{call select_user_page(
+			#{userName, mode=IN},
+			#{offset, mode=IN},
+			#{limit, mode=IN},
+			#{total, mode=OUT, jdbcType=BIGINT}
+		)}
+	</select>
+	<insert id="insertUserAndRoles" statementType="CALLABLE" >
+		{call insert_user_and_roles(
+			#{user.uid, mode=OUT, jdbcType=BIGINT},
+			#{user.userName, mode=IN},
+			#{user.userPassword, mode=IN},
+			#{user.userEmail, mode=IN},
+			#{user.userInfo, mode=IN},
+			#{user.headImg, mode=IN, jdbcType=BLOB},
+			#{user.createTime, mode=OUT, jdbcType=TIMESTAMP},
+			#{roleIds, mode=IN}
+		)}
+	</insert>
+	<delete id="deleteUserByUid" statementType="CALLABLE">
+		{call delete_user_by_uid(#{uid, mode=IN})}
+	</delete>
+</mapper>
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tk.mybatis.simple.mapper.RoleMapper">
+	<!-- 二级缓存配置，接口文件和xml文件必须同时配置 -->
+	<!-- 配置了type属性，其他属性不起作用，其他属性都在ehcache.xml文件中配置 -->
+	<!-- type="org.mybatis.caches.ehcache.EhcacheCache" -->
+	<!-- <cache
+		type="org.mybatis.caches.redis.RedisCache"
+		eviction="FIFO"
+		flushInterval="60000"
+		size="512"
+		readOnly="false"
+	/> -->
+	<!-- <cache-ref namespace="tk.mybatis.simple.mapper.RoleMapper"/> -->
+	<cache></cache>
+	<resultMap type="tk.mybatis.simple.model.SysRole" id="roleMap">
+		<id column="rid" property="rid"/>
+		<result column="role_name" property="roleName" />
+		<result column="enabled" property="enabled" />
+		<!-- <result column="create_by" property="createBy" />
+		<result column="create_time" property="createTime" jdbcType="TIMESTAMP" /> -->
+		<association property="createInfo" javaType="tk.mybatis.simple.model.CreateInfo">
+			<result column="create_by" property="createBy" />
+			<result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+		</association>
+	</resultMap>
+	
+	<resultMap type="tk.mybatis.simple.model.SysRole" extends="roleMap" id="rolePrivilegeListMap">
+		<collection property="privilegeList" resultMap="tk.mybatis.simple.mapper.PrivilegeMapper.privilegeMap"/>
+	</resultMap>
+	
+	<resultMap type="tk.mybatis.simple.model.SysRole" extends="roleMap" id="rolePrivilegeListMapSelect">
+		<collection property="privilegeList" 
+						fetchType="lazy"
+						column="{roleId = rid}"
+						select="tk.mybatis.simple.mapper.PrivilegeMapper.selectPrivilegeByRoleId"/>
+	</resultMap>
+	
+	<resultMap type="tk.mybatis.simple.model.SysRole" extends="roleMap" id="rolePrivilegeListMapChoose">
+		<discriminator javaType="Integer" column="enabled">
+			<case value="1" resultMap="rolePrivilegeListMapSelect"/>
+			<case value="0" resultMap="roleMap"/>
+			<!-- <case value="0" resultType="tk.mybatis.simple.model.SysRole">
+				<id column="rid" property="rid"/>
+				<result column="role_name" property="roleName"/>
+			</case> -->
+		</discriminator>
+	</resultMap>
+	
+	<select id="selectRoleByRid" resultMap="roleMap">
+		select * from sys_role where rid = #{rid}
+	</select>
+	
+	<select id="selectAllRoleAndPrivileges" resultMap="rolePrivilegeListMap">
+		select
+			r.rid,
+			r.role_name,
+			r.enabled,
+			r.create_by,
+			r.create_time,
+			p.pid,
+			p.privilege_name,
+			p.privilege_url
+		from
+			sys_role r
+		inner join
+			sys_role_privilege rp
+		on
+			r.rid = rp.role_id
+		inner join
+			sys_privilege p
+		on
+			rp.privilege_id = p.pid
+	</select>
+	
+	<select id="selectRoleByUserId" resultMap="rolePrivilegeListMapSelect">
+		select
+			r.rid,
+			r.role_name,
+			r.enabled,
+			r.create_by,
+			r.create_time
+		from
+			sys_role r
+		inner join
+			sys_user_role ur
+		on
+			r.rid = ur.role_id
+		where
+			ur.user_id = #{userId}
+	</select>
+	
+	<select id="selectRoleByUserIdChoose" resultMap="rolePrivilegeListMapChoose">
+		select
+			r.rid,
+			r.role_name,
+			r.enabled,
+			r.create_by,
+			r.create_time
+		from
+			sys_role r
+		inner join
+			sys_user_role ur
+		on
+			r.rid = ur.role_id
+		where
+			ur.user_id = #{userId}
+	</select>
+</mapper>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
